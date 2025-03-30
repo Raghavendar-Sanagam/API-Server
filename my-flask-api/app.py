@@ -20,12 +20,13 @@ from flask import Flask
 from flask_graphql import GraphQLView
 from flask_sqlalchemy import SQLAlchemy
 import pandas as pd
+import os
 from pyngrok import ngrok
 
 app = Flask(__name__)
-
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///bank.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db = SQLAlchemy(app)
 
 class Bank(db.Model):
@@ -44,7 +45,7 @@ with app.app_context():
 csv_file_path = "/content/bank_branches.csv"
 
 def load_data():
-    if not Bank.query.first():
+    if os.path.exists(csv_file_path) and not Bank.query.first():
         df = pd.read_csv(csv_file_path)
         for _, row in df.iterrows():
             bank = Bank(
@@ -65,51 +66,79 @@ with app.app_context():
 
 class BankType(graphene.ObjectType):
     ifsc = graphene.String()
-    bank_id = graphene.Int()
+    bank_id = graphene.Int(name = "bank_id")
     branch = graphene.String()
     address = graphene.String()
     city = graphene.String()
     district = graphene.String()
     state = graphene.String()
-    bank_name = graphene.String()
+    bank_name = graphene.String(name="bank_name")
+
+class BankEdge(graphene.ObjectType):
+    node = graphene.Field(BankType)
+
+class BankConnection(graphene.ObjectType):
+    edges = graphene.List(BankEdge)
 
 class Query(graphene.ObjectType):
-    banks = graphene.List(BankType)
+    banks = graphene.Field(BankConnection, limit=graphene.Int(), offset=graphene.Int())
+    branch = graphene.Field(BankConnection, branch=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
+    city = graphene.Field(BankConnection, city=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
+    district = graphene.Field(BankConnection, district=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
+    state = graphene.Field(BankConnection, state=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
+    bank_name = graphene.Field(BankConnection, bank_name=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
     ifsc = graphene.Field(BankType, ifsc=graphene.String())
-    bank_id = graphene.List(BankType, bank_id=graphene.Int())
-    branch = graphene.List(BankType, branch=graphene.String())
-    address = graphene.List(BankType, address=graphene.String())
-    city = graphene.List(BankType, city=graphene.String())
-    district = graphene.List(BankType, district=graphene.String())
-    state = graphene.List(BankType, state=graphene.String())
-    bank_name = graphene.List(BankType, bank_name=graphene.String())
 
-    def resolve_banks(self, info):
-        return Bank.query.all()
+    def resolve_banks(self, info, limit=None, offset=None):
+        query = Bank.query
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
     def resolve_ifsc(self, info, ifsc):
         return Bank.query.filter_by(ifsc=ifsc).first()
 
-    def resolve_bank_id(self, info, bank_id):
-        return Bank.query.filter_by(bank_id=bank_id).all()
+    def resolve_branch(self, info, branch, limit=None, offset=None):
+        query = Bank.query.filter(Bank.branch.ilike(f"%{branch}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
-    def resolve_branch(self, info, branch):
-        return Bank.query.filter_by(branch=branch).all()
+    def resolve_city(self, info, city, limit=None, offset=None):
+        query = Bank.query.filter(Bank.city.ilike(f"%{city}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
-    def resolve_address(self, info, address):
-        return Bank.query.filter_by(address=address).all()
+    def resolve_district(self, info, district, limit=None, offset=None):
+        query = Bank.query.filter(Bank.district.ilike(f"%{district}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
-    def resolve_city(self, info, city):
-        return Bank.query.filter_by(city=city).all()
+    def resolve_state(self, info, state, limit=None, offset=None):
+        query = Bank.query.filter(Bank.state.ilike(f"%{state}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
-    def resolve_district(self, info, district):
-        return Bank.query.filter_by(district=district).all()
-
-    def resolve_state(self, info, state):
-        return Bank.query.filter_by(state=state).all()
-
-    def resolve_bank_name(self, info, bank_name):
-        return Bank.query.filter_by(bank_name=bank_name).all()
+    def resolve_bank_name(self, info, bank_name, limit=None, offset=None):
+        query = Bank.query.filter(Bank.bank_name.ilike(f"%{bank_name}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
 
 schema = graphene.Schema(query=Query)
 app.add_url_rule("/gql", view_func=GraphQLView.as_view("graphql", schema=schema, graphiql=True))
