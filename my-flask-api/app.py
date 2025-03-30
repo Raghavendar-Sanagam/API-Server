@@ -88,6 +88,8 @@ class Query(graphene.ObjectType):
     state = graphene.Field(BankConnection, state=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
     bank_name = graphene.Field(BankConnection, bank_name=graphene.String(), limit=graphene.Int(), offset=graphene.Int())
     ifsc = graphene.Field(BankType, ifsc=graphene.String())
+    bank_id = graphene.Field(BankConnection, bank_id=graphene.Int(), limit=graphene.Int(), offset=graphene.Int())  
+    address = graphene.Field(BankConnection, address=graphene.String(), limit=graphene.Int(), offset=graphene.Int()) 
 
     def resolve_banks(self, info, limit=None, offset=None):
         query = Bank.query
@@ -102,6 +104,22 @@ class Query(graphene.ObjectType):
 
     def resolve_branch(self, info, branch, limit=None, offset=None):
         query = Bank.query.filter(Bank.branch.ilike(f"%{branch}%"))
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
+    
+    def resolve_bank_id(self, info, bank_id, limit=None, offset=None): 
+        query = Bank.query.filter_by(bank_id=bank_id)
+        if offset:
+            query = query.offset(offset)
+        if limit:
+            query = query.limit(limit)
+        return BankConnection(edges=[BankEdge(node=bank) for bank in query.all()])
+
+    def resolve_address(self, info, address, limit=None, offset=None): 
+        query = Bank.query.filter(Bank.address.ilike(f"%{address}%"))
         if offset:
             query = query.offset(offset)
         if limit:
